@@ -1,0 +1,166 @@
+---
+title: "Cleavage Site Analysis"
+author: Bryon Drown
+date: January 10, 2022
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 2
+---
+
+There are a lot of proteolytic products coming from the biomarker search. Let's 
+find out if the sites of cleavage matter 
+
+```{r}
+load("preprocessed.RData")
+```
+
+```{r}
+df <- hits %>%
+  filter(C.score >= 30) %>%
+  group_by(PFR, Tissue) %>%
+  slice_min(Global_Q.value) %>% # get the best hit for each proteoform in each tissue
+  slice_min(E.value) %>% # sometimes there are ties for Q.value so this breaks ties
+  slice_max(C.score) %>%
+  ungroup() %>%
+  filter(num_fragments >= ifelse(varied | modified, 3, 0))
+
+proteoforms <- df %>%
+  select(Tissue, PFR) %>%
+  unique() %>%
+  group_by(PFR) %>%
+  summarise(Num_Tissues = n())
+
+x <- df %>%
+  merge(proteoforms) %>%
+  arrange(Global_Q.value) %>%
+  select(Tissue, PFR, Uniprot_Id, Accession, Description, P.score, E.value, Global_Q.value, C.score, Proteoform_Level, Result_Set, Num_Tissues, varied, modified, num_fragments) %>%
+  filter(Num_Tissues == 1) %>%
+  select(-Num_Tissues) %>%
+  unique()
+  
+getSequence <- function(row){
+sequence <- dbGetQuery(con, 'SELECT B.ProteoformRecordNum, Isoform.Sequence, B.StartIndex, B.EndIndex
+FROM (SELECT * FROM BiologicalProteoform
+  WHERE BiologicalProteoform.ProteoformRecordNum==:x)
+  AS B LEFT JOIN Isoform ON Isoform.Id = B.IsoformId', params = list(x = row['PFR']))
+}
+
+con <- dbConnect(RSQLite::SQLite(), "tdreport_dumps/Heart.tdReport")
+fullSeq <- apply(proteoforms, 1, getSequence)
+cleavages <- do.call(rbind, fullSeq)
+dbDisconnect(con)
+
+con <- dbConnect(RSQLite::SQLite(), "tdreport_dumps/Kidney.tdReport")
+fullSeq <- apply(proteoforms, 1, getSequence)
+y <- do.call(rbind, fullSeq)
+cleavages <- rbind(cleavages, y)
+dbDisconnect(con)
+
+con <- dbConnect(RSQLite::SQLite(), "tdreport_dumps/Lung.tdReport")
+fullSeq <- apply(proteoforms, 1, getSequence)
+y <- do.call(rbind, fullSeq)
+cleavages <- rbind(cleavages, y)
+dbDisconnect(con)
+
+con <- dbConnect(RSQLite::SQLite(), "tdreport_dumps/SmInt.tdReport")
+fullSeq <- apply(proteoforms, 1, getSequence)
+y <- do.call(rbind, fullSeq)
+cleavages <- rbind(cleavages, y)
+dbDisconnect(con)
+
+con <- dbConnect(RSQLite::SQLite(), "tdreport_dumps/Spleen.tdReport")
+fullSeq <- apply(proteoforms, 1, getSequence)
+y <- do.call(rbind, fullSeq)
+cleavages <- rbind(cleavages, y)
+dbDisconnect(con)
+
+cleavages <- unique(cleavages)
+
+# We only want to work with proteoforms that have a cleavage at least 4 amino acids
+# into the sequence so that we can get the full cleavage site characterized
+
+left <- cleavages %>%
+  mutate(fullLength = str_length(Sequence)) %>%
+  filter(StartIndex > 3) %>%
+  mutate(site = substr(Sequence, StartIndex-3, StartIndex+4)) %>%
+  mutate(side = "N-terminal")
+
+right <- cleavages %>%
+  mutate(fullLength = str_length(Sequence)) %>%
+  filter(EndIndex < fullLength-4) %>%
+  mutate(site = substr(Sequence, EndIndex-2, EndIndex+5)) %>%
+  mutate(side = "C-terminal")
+
+cleavages <- rbind(left, right)
+
+```
+
+```{r}
+
+# For a background, we'll use the sequences for all proteoforms
+all.pfm <- Biostrings::consensusMatrix(cleavages$site)
+colnames(all.pfm) <- c('P4', 'P3', 'P2', 'P1', "P1\'", "P2\'", "P3\'", "P4\'")
+bg <- apply(all.pfm, 1, function(x) return(median(x)))
+bg <- bg/sum(bg)
+
+pdf(file = "figures/seqLogo_allPFRs.pdf", width = 5, height = 5)
+Logolas::logomaker(all.pfm, type = "Logo")
+grid::grid.text(x = 0.5, y = 0.95, label="All Subseqence PFRs")
+dev.off()
+
+# Tissue Specific
+cleavages.specific <- cleavages %>%
+  filter(ProteoformRecordNum %in% x$PFR)
+specific.pfm <- Biostrings::consensusMatrix(cleavages.specific$site)
+colnames(specific.pfm) <- c('P4', 'P3', 'P2', 'P1', "P1\'", "P2\'", "P3\'", "P4\'")
+pdf(file = "figures/seqLogo_SpecificPFRs.pdf", width = 5, height = 5)
+Logolas::logomaker(specific.pfm, type = "Logo")
+grid::grid.text(x = 0.5, y = 0.95, label="Tissue Specific PFRs")
+dev.off()
+
+buildLogoPlot <- function(row){
+  tissue <- row['Var1']
+  cleavageGroup <- row['Var2']
+  
+  tissue.pfrs <- x %>%
+    filter(Tissue == tissue)
+  
+  sites <- cleavages %>%
+    filter(side == cleavageGroup) %>%
+    filter(ProteoformRecordNum %in% tissue.pfrs$PFR)
+  
+  # Report out the number of proteoforms used to build figure
+  print(paste("Tissue:", tissue, "Terminus:", cleavageGroup))
+  print(paste(nrow(sites)))
+  
+  tissue.pfm <-  Biostrings::consensusMatrix(sites$site)
+  colnames(tissue.pfm) <- c('P4', 'P3', 'P2', 'P1', "P1\'", "P2\'", "P3\'", "P4\'")
+  
+  pdf(file = paste("figures/seqLogo", tissue, cleavageGroup, "specific.pdf", sep = "_"),
+      width = 5, height = 5)
+  Logolas::logomaker(tissue.pfm, type = "EDLogo", bg=bg)
+  grid::grid.text(x = 0.5, y = 0.95, label=paste(tissue, cleavageGroup, sep="\n"))
+  dev.off()
+}
+
+y <- expand.grid(tissues, c("N-terminal", "C-terminal"))
+apply(y, 1, buildLogoPlot)
+
+
+```
+
+
+It seems like there's a lot of cleavage happening by chymotrypsin in multple tissues
+Lung tissue seems unique in the enrichment of cysteine at P1.
+
+```{r}
+lung.pfrs <- x %>%
+  filter(Tissue == "Lung")
+sites <- cleavages %>%
+  filter(side == "N-terminal") %>%
+  filter(ProteoformRecordNum %in% lung.pfrs$PFR) %>%
+  mutate(P1 = substr(site,4,4)) %>%
+  filter(P1 == "C") %>%
+  merge(lung.pfrs, by.x = "ProteoformRecordNum", by.y = "PFR")
+```

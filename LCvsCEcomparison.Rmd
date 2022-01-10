@@ -1,0 +1,816 @@
+---
+title: "Comparison of LC and CE"
+author: Bryon Drown
+date: January 10, 2022
+output: 
+  html_notebook:
+    toc: true
+    toc_depth: 2
+---
+
+# Intro
+
+This dataset consists of LC-MS/MS and CE-MS/MS acquisitions of GELFrEE fractions
+from heart, spleen, and small intestine lysates. For CE-MS/MS acquisition, a CESI-8000
+was used to introduce samples to a Thermo Orbitrap Eclipse MS. For LC-MS/MS
+acquisitions, an Ultimate 3000 nanoLC was used to separate/introduce samples
+with a handpacked PLRPS column to a Thermo Orbitrap Fusion Lumos Tribrid MS.
+
+Resulting raw files were searched on TDportal 4.0 against a human database 
+with curated histone proteoforms. Isoforms, proteoforms, and hits were dumped
+using TDviewer and saved as csv files in `tdreport_dumps`. The following
+analysis utilizes these files as input.
+
+First, we need to calculate the properties of proteins. A python script that 
+utilizes Biopython was written:
+```{bash eval=FALSE}
+python calc_protein_props.py tdreport_dumps/hits_list.csv data/hits_list_props.csv
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# Load libraries
+
+library(tidyverse)
+library(VennDiagram)
+library(venn)
+library(car)
+
+load("preprocessed.RData")
+```
+
+
+# Overall physiochemical properties
+
+It's possible that CE and LC will create a bias in the type of proteoforms 
+detected. We'll first look at the distribution of several physiochemical
+properties that can be calculated with ProtParam.
+
+```{r}
+# Overall distribution of proteoform physiochemical properties
+
+# pI
+plot <- hits %>%
+  select(PFR, pI, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = pI, x = Separation, fill = Tissue)) +
+    geom_violin() +
+    theme_bw(base_size = 16)
+plot
+pdf(file = "figures/LCvsCE_pI_overall.pdf", width = 7, height = 5,
+    pointsize = 16)
+print(plot)
+dev.off()
+
+# Lipophilicity
+plot <- hits %>%
+  select(PFR, GRAVY, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = GRAVY, x = Separation, fill = Tissue)) +
+    geom_violin() +
+    theme_bw(base_size = 16) +
+    labs(y = "Lipophilicity (GRAVY)")
+plot
+pdf(file = "figures/LCvsCE_GRAVY_overall.pdf", width = 7, height = 5,
+    pointsize = 16)
+print(plot)
+dev.off()
+
+# Mass
+plot <- hits %>%
+  select(PFR, Monoisotopic_Mass, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = Monoisotopic_Mass, x = Separation, fill = Tissue)) +
+    geom_violin() +
+    theme_bw(base_size = 16) +
+    labs(y = "Monoisotopic Mass (Da)")
+plot
+pdf(file = "figures/LCvsCE_Mass_overall.pdf", width = 7, height = 5,
+    pointsize = 16)
+print(plot)
+dev.off()
+
+```
+
+# Separation Ability
+
+## Mass vs Retention Time
+```{r}
+df <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  select(PFR, Tissue, Separation, Fraction, Average_Retention_Time, Monoisotopic_Mass) %>%
+  unique() %>%
+  group_by(PFR, Tissue, Separation, Fraction) %>%
+  summarise(Time = mean(Average_Retention_Time), Mass = mean(Monoisotopic_Mass), .groups = "drop")
+
+plot <- df %>%
+  ggplot(aes(x = Time, y = Mass/1000, color = Separation)) +
+  geom_point() +
+  geom_smooth(aes(color = 'black'),method = "lm") +
+  facet_grid(Separation ~ Fraction) +
+  labs(x = "Time (min)", y = "Mass (kDa)") +
+  theme_bw(base_size = 16) +
+  theme(legend.position = 'none',
+        axis.title = element_text(face = "bold"))
+plot
+pdf(file = "figures/LCvsCE_TimevsMass.pdf", width = 11, height = 4)
+print(plot)
+dev.off()
+
+df <- mutate(df, SepFraction = paste0(Separation, Fraction))
+s <- by(df, df$SepFraction, FUN=function(X) cor(X$Time, X$Mass, method = "spearman"))
+p <- by(df, df$SepFraction, FUN=function(X) cor(X$Time, X$Mass, method = "pearson"))
+r <- data.frame(group = dimnames(s)[[1]], spearman = as.vector(s), pearson = as.vector(p))
+
+dat <- r %>%
+  mutate(Frac = str_sub(group, -1, -1), Sep = str_sub(group, 1, -2)) %>%
+  mutate(z = 0.5 * (log(1 + pearson) - log(1 - pearson))) %>%
+  select(Frac, Sep, pearson, z)
+
+anova_model <- aov(z ~ Frac + Sep, data=dat)
+Anova(anova_model, type = 2)
+```
+
+## GRAVY vs Time
+```{r}
+df <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  select(PFR, Tissue, Separation, Fraction, Average_Retention_Time, GRAVY) %>%
+  unique() %>%
+  group_by(PFR, Tissue, Separation, Fraction) %>%
+  summarise(Time = mean(Average_Retention_Time), GRAVY = mean(GRAVY), .groups = "drop")
+
+plot <- df %>%
+  ggplot(aes(x = Time, y = GRAVY, color = Separation)) +
+  geom_point() +
+  geom_smooth(aes(color = 'black'),method = "lm") +
+  facet_grid(Separation ~ Fraction) +
+  labs(x = "Time (min)", y = "Hydrophobicity (GRAVY)") +
+  theme_bw(base_size = 16) +
+  theme(legend.position = 'none',
+        axis.title = element_text(face = "bold"))
+plot
+pdf(file = "figures/LCvsCE_TimevsGRAVY.pdf", width = 11, height = 4)
+print(plot)
+dev.off()
+
+df <- mutate(df, SepFraction = paste0(Separation, Fraction))
+s <- by(df, df$SepFraction, FUN=function(X) stats::cor(X$Time, X$GRAVY, method = "spearman", use = "complete.obs"))
+p <- by(df, df$SepFraction, FUN=function(X) stats::cor(X$Time, X$GRAVY, method = "pearson", use = "complete.obs"))
+r <- data.frame(group = dimnames(s)[[1]], spearman = as.vector(s), pearson = as.vector(p))
+r
+
+dat <- r %>%
+  mutate(Frac = str_sub(group, -1, -1), Sep = str_sub(group, 1, -2)) %>%
+  mutate(z = 0.5 * (log(1 + pearson) - log(1 - pearson))) %>%
+  select(Frac, Sep, pearson, z)
+
+anova_model <- aov(z ~ Frac + Sep, data=dat)
+Anova(anova_model, type = 2)
+```
+
+## Time vs Mass/Charge
+```{r}
+library(Peptides)
+
+df <- hits %>%
+  mutate(ChargeAt24 = charge(Sequence, pH = 2.4, pKscale = "Bjellqvist")) %>%
+  mutate(mz = Monoisotopic_Mass / ChargeAt24) %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  select(PFR, Tissue, Separation, Fraction, Average_Retention_Time, mz) %>%
+  unique() %>%
+  group_by(PFR, Tissue, Separation, Fraction) %>%
+  summarise(mz = mean(mz), Time = mean(Average_Retention_Time), .groups = "drop")
+
+plot <- df %>%
+  ggplot(aes(x = Time, y = mz, color = Separation)) +
+  geom_point() +
+  geom_smooth(aes(color = 'black'),method = "lm") +
+  facet_grid(Separation ~ Fraction) +
+  labs(x = "Time (min)", y = "Mass to Charge Ratio") +
+  theme_bw(base_size = 16) +
+  theme(legend.position = 'none',
+        axis.title = element_text(face = "bold"))
+plot
+pdf(file = "figures/LCvsCE_TimevsMZ.pdf", width = 11, height = 4)
+print(plot)
+dev.off()
+
+df <- mutate(df, SepFraction = paste0(Separation, Fraction))
+s <- by(df, df$SepFraction, FUN=function(X) stats::cor(X$Time, X$mz, method = "spearman", use = "complete.obs"))
+p <- by(df, df$SepFraction, FUN=function(X) stats::cor(X$Time, X$mz, method = "pearson", use = "complete.obs"))
+r <- data.frame(group = dimnames(s)[[1]], spearman = as.vector(s), pearson = as.vector(p))
+r
+
+dat <- r %>%
+  mutate(Frac = str_sub(group, -1, -1), Sep = str_sub(group, 1, -2)) %>%
+  mutate(z = 0.5 * (log(1 + pearson) - log(1 - pearson))) %>%
+  select(Frac, Sep, pearson, z)
+
+anova_model <- aov(z ~ Frac + Sep, data=dat)
+Anova(anova_model, type = 2)
+```
+## Relationship between physiochemical properties
+```{r}
+df <- hits %>%
+  mutate(ChargeAt24 = charge(Sequence, pH = 2.4, pKscale = "Bjellqvist")) %>%
+  mutate(mz = Monoisotopic_Mass / ChargeAt24) %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  select(PFR, Tissue, Separation, Fraction, Average_Retention_Time, Monoisotopic_Mass, GRAVY, pI, mz, ChargeAt24) %>%
+  unique() %>%
+  group_by(PFR, Tissue, Separation, Fraction) %>%
+  summarise(mz = mean(mz), Time = mean(Average_Retention_Time), Mass = mean(Monoisotopic_Mass), 
+            pI = mean(pI), GRAVY = mean(GRAVY), ChargeAt24 = mean(ChargeAt24), .groups = "drop")
+
+plot <- df %>%
+  ggplot(aes(x = GRAVY, y = mz/1000, color = Separation)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Hydrophobicity (GRAVY)", y = "Mass to Charge Ratio at pH 2.4") +
+  theme_bw(base_size = 16) +
+  theme(legend.position = 'right',
+        axis.title = element_text(face = "bold"))
+plot
+ggsave("figures/GRAVYvsMZ.pdf", plot, width = 7, height = 5, units = "in")
+
+plot <- df %>%
+  ggplot(aes(y = Mass/1000, x = GRAVY, color = Separation)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x =  "Hydrophobicity (GRAVY)", y = "Mass (kDa)") +
+  theme_bw(base_size = 16) +
+  theme(legend.position = 'right',
+        axis.title = element_text(face = "bold"))
+plot
+ggsave("figures/GRAVYvsMass.pdf", plot, width = 7, height = 5, units = "in")
+
+plot <- df %>%
+  ggplot(aes(y = ChargeAt24, x = GRAVY, color = Separation)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x =  "Hydrophobicity (GRAVY)", y = "Charge at pH 2.4") +
+  theme_bw(base_size = 16) +
+  theme(legend.position = 'right',
+        axis.title = element_text(face = "bold"))
+plot
+ggsave("figures/GRAVYvsCharge.pdf", plot, width = 7, height = 5, units = "in")
+```
+
+# Proteome coverage
+Proteome coverage is a metric first described by James Fulcher at PNNL:
+Fulcher, J. M.; Makaju, A.; Moore, R. J.; Zhou, M.; Bennett, D. A.; Jager, P. L. D.; Qian, W.-J.; Paša-Tolić, L.; Petyuk, V. A. Enhancing Top-Down Proteomics of Brain Tissue with FAIMS. J Proteome Res 2021, 20 (5), 2780–2795. https://doi.org/10.1021/acs.jproteome.1c00049.
+
+The idea is to count the length of non-redundant sequences covered by proteoforms.
+The merging of proteoform sequences is performed by helper functions in `proteome_coverage.R`
+
+```{r}
+source("proteome_coverage.R")
+
+get_coverage <- function(df) {
+  df <- df %>% select(Accession, Start_Index, End_Index) %>%
+    unique()
+  y <- lapply(split(df[2:3], df$Accession), proteome_coverage)
+  return(sum(unlist(y)))
+}
+
+df <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  select(Separation, Accession, Start_Index, End_Index)
+x <- lapply(split(df[2:4], df$Separation), get_coverage)
+x <- as.data.frame(x) %>%
+  pivot_longer(cols = c("CZE", "LC"), names_to = "Separation", values_to = "Coverage") %>%
+  mutate(Percent_Coverage = Coverage/human_proteome_aa)
+
+ggplot(x, aes(x = Separation, y = Coverage)) +
+  geom_col()
+
+ggplot(x, aes(x = Separation, y = Percent_Coverage)) +
+  geom_col()
+
+```
+
+
+# Unique proteoforms/proteins
+
+## Venn Diagrams
+
+```{r, fig.dim = c(5,5)}
+venn.pfr <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  select(PFR, Separation) %>%
+  unique() %>%
+  arrange(PFR)
+
+lc <- filter(venn.pfr, Separation == "LC")$PFR
+cze <- filter(venn.pfr, Separation == "CZE")$PFR
+
+# Output for external analysis
+write(lc, "output_data/pfr_lc.txt", ncolumns = 1)
+write(cze, "output_data/pfr_cze.txt", ncolumns = 1)
+
+plt <- venn.diagram(
+  x = list(lc, cze),
+  category.names = c("LC", "CZE"),
+  filename = NULL,
+  
+  # Title
+  main = "Proteoforms Identified by Separation Technique",
+  main.cex = 1.5,
+  main.fontface = "bold",
+  main.fontfamily = "sans",
+
+  # Colors
+  col=c("#440154ff", '#21908dff'),
+  fill = c(alpha("#440154ff",0.3), alpha('#21908dff',0.3)),
+  cat.col=c("#440154ff", '#21908dff'),
+  
+  # Numbers
+  cex = 2,
+  fontface = "bold",
+  fontfamily = "sans",
+  cat.pos = c(-150, 150),
+  cat.dist = c(0.055, 0.055),
+  
+  # Set names
+  cat.cex = 2,
+  cat.fontface = "bold",
+  cat.default.pos = "outer",
+  cat.fontfamily = "sans"
+)
+grid::grid.newpage()
+grid::grid.draw(plt)
+```
+
+```{r}
+venn.protein <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  select(Uniprot_Id, Separation) %>%
+  unique() %>%
+  arrange(Uniprot_Id)
+
+lc <- filter(venn.protein, Separation == "LC")$Uniprot_Id
+cze <- filter(venn.protein, Separation == "CZE")$Uniprot_Id
+
+# Output for external analysis
+write(lc, "output_data/protein_lc.txt", ncolumns = 1)
+write(cze, "output_data/protein_cze.txt", ncolumns = 1)
+
+plt <- venn.diagram(
+  x = list(lc, cze),
+  category.names = c("LC", "CZE"),
+  filename = NULL,
+  
+  # Title
+  main = "Proteins Identified by Separation Technique",
+  main.cex = 1.5,
+  main.fontface = "bold",
+  main.fontfamily = "sans",
+
+  # Colors
+  col=c("#440154ff", '#21908dff'),
+  fill = c(alpha("#440154ff",0.3), alpha('#21908dff',0.3)),
+  cat.col=c("#440154ff", '#21908dff'),
+  
+  # Numbers
+  cex = 2,
+  fontface = "bold",
+  fontfamily = "sans",
+  cat.pos = c(-150, 150),
+  cat.dist = c(0.055, 0.055),
+  
+  # Set names
+  cat.cex = 2,
+  cat.fontface = "bold",
+  cat.default.pos = "outer",
+  cat.fontfamily = "sans"
+)
+grid::grid.newpage()
+grid::grid.draw(plt)
+```
+
+
+
+## Proteoforms per Protein
+
+It looks like CZE is revealing more proteoforms per protein entry. I'm 
+interested to see if this phenomenon is evenly distributed or if there is a 
+subset of proteins (e.g. histones) that are driving this observation.
+
+```{r}
+# First count the number of proteoforms
+pfr_count <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  select(PFR, Uniprot_Id, Separation) %>%
+  unique() %>%
+  group_by(Uniprot_Id, Separation) %>%
+  summarise(Count = n(), .groups = "drop")
+
+# Which protein entries have the most proteoforms?
+pfr_count %>%
+  arrange(-Count) %>%
+  pivot_wider(names_from = "Separation", values_from = "Count")
+```
+
+There are no big surprises for which proteins are more frequently characterized
+
+
+```{r}
+ggplot(pfr_count, aes(x = Count, fill = Separation)) +
+  geom_histogram(binwidth = 5) +
+  facet_wrap(~ Separation) +
+  xlim(c(-10,100))
+
+```
+
+
+
+## Properties of unique proteoforms
+
+The difference in physiochemical properties may be more apparent when looking
+only at unqiue proteoforms. Here proteoforms that were observed by both 
+separation methods are removed.
+
+### pI
+
+```{r}
+# Vectors of all PFRs found by each method
+lc <- filter(venn.pfr, Separation == "LC")$PFR
+cze <- filter(venn.pfr, Separation == "CZE")$PFR
+
+# Vectors of unique PFRs found by each method
+lc.unique <- setdiff(lc, cze)
+cze.unique <- setdiff(cze, lc)
+both <- intersect(lc, cze)
+
+lc <- hits %>%
+  filter(PFR %in% lc.unique) %>%
+  select(PFR, pI, GRAVY, Monoisotopic_Mass, Separation, Tissue) %>%
+  unique()
+cze <- hits %>%
+  filter(PFR %in% cze.unique) %>%
+  select(PFR, pI, GRAVY, Monoisotopic_Mass, Separation, Tissue) %>%
+  unique()
+
+# Grab the properties of the PFRs from hits
+hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  filter(!PFR %in% both) %>%
+  select(PFR, pI, Separation) %>%
+  unique() %>%
+  ggplot(aes(y = pI, x = Separation)) +
+    geom_violin() +
+    theme_bw() +
+    labs(title = "Unique Proteoforms pI Distribution by Separation")
+plot <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  filter(!PFR %in% both) %>%
+  select(PFR, pI, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = pI, x = Separation, fill = Tissue)) +
+    geom_violin() +
+    theme_bw(base_size = 16) +
+    labs(y = "pI")
+plot
+pdf(file = "figures/LCvsCE_pI_Unique.pdf", width = 7, height = 5,
+    pointsize = 16)
+print(plot)
+dev.off()
+
+# Kolmogorov–Smirnov test to compare distributions
+ks.test(lc$pI, cze$pI)
+```
+
+Basic proteins seem to be enriched in CZE measurements but it's no more apparent
+than when looking at overall proteoforms.
+
+### Lipophilicity
+
+```{r}
+# Lipophilicity
+hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  filter(!PFR %in% both) %>%
+  select(PFR, GRAVY, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = GRAVY, x = Separation)) +
+    geom_violin() +
+    theme_bw() +
+    labs(title = "Unique Proteoform Lipophilicity Distribution by Separation")
+plot <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  filter(!PFR %in% both) %>%
+  select(PFR, GRAVY, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = GRAVY, x = Separation, fill = Tissue)) +
+    geom_violin() +
+    theme_bw(base_size = 16) +
+    labs(y = "Lipophilicity (GRAVY)")
+plot
+pdf(file = "figures/LCvsCE_GRAVY_Unique.pdf", width = 7, height = 5,
+    pointsize = 16)
+print(plot)
+dev.off()
+
+# Kolmogorov–Smirnov test to compare distributions
+ks.test(lc$GRAVY, cze$GRAVY)
+```
+
+### Mass
+
+```{r}
+# Mass
+hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  filter(!PFR %in% both) %>%
+  select(PFR, Monoisotopic_Mass, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = Monoisotopic_Mass, x = Separation)) +
+    geom_violin() +
+    theme_bw() +
+    labs(y = "Monoisotopic Mass (Da)")
+plot <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  filter(!PFR %in% both) %>%
+  select(PFR, Monoisotopic_Mass, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = Monoisotopic_Mass, x = Separation, fill = Tissue)) +
+    geom_violin() +
+    theme_bw(base_size = 16) +
+    labs(y = "Monoisotopic Mass (Da)")
+plot
+pdf(file = "figures/LCvsCE_Mass_Unique.pdf", width = 7, height = 5,
+    pointsize = 16)
+print(plot)
+dev.off()
+
+# Kolmogorov–Smirnov test to compare distributions
+ks.test(lc$Monoisotopic_Mass, cze$Monoisotopic_Mass)
+```
+
+## Properties of unique proteins
+
+### pI
+
+```{r}
+# Vectors of all PFRs found by each method
+lc <- filter(venn.protein, Separation == "LC")$Uniprot_Id
+cze <- filter(venn.protein, Separation == "CZE")$Uniprot_Id
+
+# Vectors of unique PFRs found by each method
+lc.unique <- setdiff(lc, cze)
+cze.unique <- setdiff(cze, lc)
+both <- intersect(lc, cze)
+
+# Dataframes of properties for when performing K-S tests
+lc <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  filter(Uniprot_Id %in% lc.unique) %>%
+  select(PFR, pI, GRAVY, Monoisotopic_Mass, Separation, Tissue) %>%
+  unique()
+cze <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  filter(Uniprot_Id %in% cze.unique) %>%
+  select(PFR, pI, GRAVY, Monoisotopic_Mass, Separation, Tissue) %>%
+  unique()
+
+# Grab the properties of the PFRs from hits
+hits %>%
+  filter(!Uniprot_Id %in% both) %>%
+  select(PFR, pI, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = pI, x = Separation, fill = Tissue)) +
+    geom_violin() +
+    theme_bw() +
+    labs(y = "pI")
+hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  filter(!Uniprot_Id %in% both) %>%
+  select(PFR, pI, Separation) %>%
+  unique() %>%
+  ggplot(aes(y = pI, x = Separation)) +
+    geom_violin() +
+    theme_bw() +
+    labs(y = "pI")
+
+# Kolmogorov–Smirnov test to compare distributions
+ks.test(lc$pI, cze$pI)
+```
+
+### Lipophilicity
+```{r}
+# Lipophilicity
+hits %>%
+  filter(!Uniprot_Id %in% both) %>%
+  select(PFR, GRAVY, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = GRAVY, x = Separation, fill = Tissue)) +
+    geom_violin() +
+    theme_bw() +
+    labs(title = "Proteoform Lipophilicity Distribution from Unique Proteins")
+hits %>%
+  filter(!Uniprot_Id %in% both) %>%
+  select(PFR, GRAVY, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = GRAVY, x = Separation)) +
+    geom_violin() +
+    theme_bw() +
+    labs(title = "Proteoform Lipophilicity Distribution from Unique Proteins")
+
+# Kolmogorov–Smirnov test to compare distributions
+ks.test(lc$GRAVY, cze$GRAVY)
+```
+
+### Mass
+
+```{r}
+# Mass
+hits %>%
+  filter(!Uniprot_Id %in% both) %>%
+  select(PFR, Monoisotopic_Mass, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = Monoisotopic_Mass, x = Separation)) +
+    geom_violin() +
+    theme_bw() +
+    labs(title = "Proteoform Mass Distribution from Unique Proteins")
+hits %>%
+  filter(!Uniprot_Id %in% both) %>%
+  select(PFR, Monoisotopic_Mass, Separation, Tissue) %>%
+  unique() %>%
+  ggplot(aes(y = Monoisotopic_Mass, x = Separation, fill = Tissue)) +
+    geom_violin() +
+    theme_bw() +
+    labs(title = "Proteoform Mass Distribution from Unique Proteins")
+
+# Kolmogorov–Smirnov test to compare distributions
+ks.test(lc$Monoisotopic_Mass, cze$Monoisotopic_Mass)
+```
+
+# PTM Enrichment
+
+## PFR level
+
+Do the two separation techniques favor proteoforms with particular PTMs?
+The goal here is to see if particular PTMs are enriched in each dataset. I'm
+going to ignore N- and C-terminal modifications and just pull whatever is in
+the `Modification_Codes` column of the Hit Report.
+
+```{r}
+# Many of the PTMs that are actually very specific (e.g. phosphoserine)
+# We instead want to group all phosphorylations together
+# ptm_map relates specific PTMs to their more general PSI-MOD entries
+ptm_map <- read.csv(file = "data/ptm_mapping.csv")
+colnames(ptm_map)[1] <- "Modification_Codes"
+
+df <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  select(PFR, Separation, Modification_Codes) %>%
+  unique() %>%
+  separate_rows(Modification_Codes, sep="\\|") %>%
+  mutate(Modification_Codes = str_split(Modification_Codes, pattern="@", simplify = TRUE)[,1])
+
+# Now count the number of each PTM in PFRs
+# If a PFR contains the same PTM multiple times, it is counted multiple times
+ptm_counts <- merge(df, ptm_map)%>%
+  select(General.Description, Separation) %>%
+  ungroup() %>%
+  group_by(General.Description, Separation) %>%
+  summarise(Count = n(), .groups = "drop") %>%
+  arrange(-Count)
+
+# The Chi-squared test is not accurate when there are fewer than 5 observations
+# so I'll remove any PTMs that were seen fewer than 5 times.
+ptm_counts <- ptm_counts %>%
+  pivot_wider(names_from = Separation, values_from = Count, values_fill = 0) %>%
+  filter(CZE >=5 & LC >=5)
+
+# The base Chi-squared test function accepts a matrix with named rows as input
+mtx <- ptm_counts %>%
+  select(-General.Description) %>%
+  as.matrix
+rownames(mtx) <- ptm_counts$General.Description
+
+# Let's calculate the rate of observing each mod
+ptm_counts <- ptm_counts %>%
+  mutate(CZE_rate = CZE / sum(ptm_counts$CZE)) %>%
+  mutate(LC_rate = LC / sum(ptm_counts$LC)) 
+
+# Chi-squared
+test <- chisq.test(mtx)
+test
+
+# Compare the expected distribution to the actual distribution
+ptm_counts$CZE_expected <- test$expected[,"CZE"]
+ptm_counts$LC_expected <- test$expected[,"LC"]
+ptm_counts
+```
+
+So there is a difference in the distributions by the Chi-squared test.
+The next step is to figure out which PTMs show significant differences. This
+will be accomplished by performing each 2x2 Chi-squared test for each PTM vs the
+sum of all other PTMs. A similar analysis was performed for the observation of 
+birds in different environments:
+
+LATTA, S. C.; HOWELL, C. A.; DETTLING, M. D.; CORMIER, R. L. Use of Data on Avian Demographics and Site Persistence during Overwintering to Assess Quality of Restored Riparian Habitat. Conserv Biol 2012, 26 (3), 482–492. https://doi.org/10.1111/j.1523-1739.2012.01828.x.
+
+```{r}
+# Helper function that will perform the 2x2 Chi-squared and return a p-value
+# i: index of row to compare
+# m: matrix
+compare_ptm <- function(i, m){
+  current <- m[i,]
+  other <- colSums(m[-i,])
+  x <- matrix(c(current, other), 2, 2)
+  test = chisq.test(x)
+  return(list("p_value" = test$p.value, "chi" = test$statistic))
+}
+
+# Iterate over the matrix and calculate the p-value from the Chi-squared test
+# comparing the given PTM to all other PTMs
+ptm_counts$p_value <- NA
+ptm_counts$chi <- NA
+for(i in seq(1,nrow(mtx))){
+  values <- compare_ptm(i, mtx)
+  ptm_counts$p_value[i] <- values$p_value
+  ptm_counts$chi[i] <- values$chi
+}
+
+# Since there are multiple tests, let's correct the critical p-value
+alpha <- 0.01
+ptm_counts$p_value <- ptm_counts$p_value * nrow(mtx)
+
+# Which PTMs are significantly different from the expected distribution?
+(ptm_counts <- mutate(ptm_counts, significant = p_value < alpha))
+data.table::fwrite(ptm_counts, file="output_data/ptm_counts.txt")
+```
+
+After the multiple tests, it appears monoacetylation was overrepresented in LC 
+data while monomethylation and half cystine was over-represented in CZE data.
+
+## PfSM level
+
+```{r}
+# Many of the PTMs that are actually very specific (e.g. phosphoserine)
+# We instead want to group all phosphorylations together
+# ptm_map relates specific PTMs to their more general PSI-MOD entries
+ptm_map <- read.csv(file = "data/ptm_mapping.csv")
+colnames(ptm_map)[1] <- "Modification_Codes"
+
+df <- hits %>%
+  filter(Tissue %in% c("Heart", "SmInt", "Spleen")) %>%
+  select(HitId, PFR, Separation, Modification_Codes) %>%
+  unique() %>%
+  separate_rows(Modification_Codes, sep="\\|") %>%
+  mutate(Modification_Codes = str_split(Modification_Codes, pattern="@", simplify = TRUE)[,1])
+
+# Now count the number of each PTM in PFRs
+# If a PFR contains the same PTM multiple times, it is counted multiple times
+ptm_counts <- merge(df, ptm_map)%>%
+  select(General.Description, Separation) %>%
+  ungroup() %>%
+  group_by(General.Description, Separation) %>%
+  summarise(Count = n(), .groups = "drop") %>%
+  arrange(-Count)
+
+# The Chi-squared test is not accurate when there are fewer than 5 observations
+# so I'll remove any PTMs that were seen fewer than 5 times.
+ptm_counts <- ptm_counts %>%
+  pivot_wider(names_from = Separation, values_from = Count, values_fill = 0) %>%
+  filter(CZE >=5 & LC >=5)
+
+# The base Chi-squared test function accepts a matrix with named rows as input
+mtx <- ptm_counts %>%
+  select(-General.Description) %>%
+  as.matrix
+rownames(mtx) <- ptm_counts$General.Description
+
+# Let's calculate the rate of observing each mod
+ptm_counts <- ptm_counts %>%
+  mutate(CZE_rate = CZE / sum(ptm_counts$CZE)) %>%
+  mutate(LC_rate = LC / sum(ptm_counts$LC)) 
+
+# Chi-squared
+test <- chisq.test(mtx)
+test
+
+# Compare the expected distribution to the actual distribution
+ptm_counts$CZE_expected <- test$expected[,"CZE"]
+ptm_counts$LC_expected <- test$expected[,"LC"]
+ptm_counts
+
+# Iterate over the matrix and calculate the p-value from the Chi-squared test
+# comparing the given PTM to all other PTMs
+ptm_counts$p_value <- NA
+ptm_counts$chi <- NA
+for(i in seq(1,nrow(mtx))){
+  values <- compare_ptm(i, mtx)
+  ptm_counts$p_value[i] <- values$p_value
+  ptm_counts$chi[i] <- values$chi
+}
+
+# Since there are multiple tests, let's correct the critical p-value
+alpha <- 0.05
+ptm_counts$p_value <- ptm_counts$p_value * nrow(mtx)
+
+# Which PTMs are significantly different from the expected distribution?
+(ptm_counts <- mutate(ptm_counts, significant = p_value < alpha))
+data.table::fwrite(ptm_counts, file="output_data/ptm_counts_psm.txt")
+```

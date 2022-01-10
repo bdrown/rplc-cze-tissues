@@ -1,0 +1,37 @@
+Specific,Specific Description,General,General Description
+PSI-MOD:115,S-palmitoyl-L-cysteine,PSI-MOD:00115,S-palmitoyl-L-cysteine
+PSI-MOD:125,Hypusine,PSI-MOD:00125,Hypusine
+PSI-MOD:1352,nitrated L-tyrosine,PSI-MOD:00461,nitrated residue
+PSI-MOD:1781,N6-butanoyl-L-lysine,PSI-MOD:01996,butanoylated residue
+PSI-MOD:1982,"N,N,N-trimethylglycine",PSI-MOD:00711,trimethylated protonated-residue
+PSI-MOD:235,S-nitrosyl-L-cysteine,PSI-MOD:02077,nitrosylated residue
+PSI-MOD:242,O-(ADP-ribosyl)-L-serine,PSI-MOD:00752,monoadenosine diphosphoribosyl (ADP-ribosyl) modified residue
+PSI-MOD:267,L-cysteine sulfinic acid,PSI-MOD:00267,L-cysteine sulfinic acid
+PSI-MOD:280,N-pyruvic acid 2-iminyl-L-valine,PSI-MOD:01170,pyruvic acid iminylated residue
+PSI-MOD:394,monoacetylated residue,PSI-MOD:00394,monoacetylated residue
+PSI-MOD:40,2-pyrrolidone-5-carboxylic acid (Gln),PSI-MOD:01160,deaminated residue
+PSI-MOD:41,L-gamma-carboxyglutamic acid,PSI-MOD:01152,carboxylated residue
+PSI-MOD:425,monohydroxylated residue,PSI-MOD:00425,monohydroxylated residue
+PSI-MOD:429,dimethylated residue,PSI-MOD:00429,dimethylated residue
+PSI-MOD:47,O-phospho-L-threonine,PSI-MOD:00696,phosphorylated residue
+PSI-MOD:48,O4'-phospho-L-tyrosine,PSI-MOD:00696,phosphorylated residue
+PSI-MOD:53,N-acetyl-L-glutamic acid,PSI-MOD:00394,monoacetylated residue
+PSI-MOD:599,monomethylated residue,PSI-MOD:00599,monomethylated residue
+PSI-MOD:68,N-myristoylglycine,PSI-MOD:00438,myristoylated residue
+PSI-MOD:684,deamidated L-asparagine,PSI-MOD:00684,deamidated L-asparagine
+PSI-MOD:696,phosphorylated residue,PSI-MOD:00696,phosphorylated residue
+PSI-MOD:71,"N,N,N-trimethyl-L-alanine",PSI-MOD:00711,trimethylated protonated-residue
+PSI-MOD:783,dimethylated L-arginine,PSI-MOD:00429,dimethylated residue
+PSI-MOD:798,half cystine,PSI-MOD:00798,half cystine
+PSI-MOD:83,"N6,N6,N6-trimethyl-L-lysine",PSI-MOD:00711,trimethylated protonated-residue
+PSI-MOD:84,"N6,N6-dimethyl-L-lysine",PSI-MOD:00429,dimethylated residue
+PSI-MOD:91,L-arginine amide,PSI-MOD:00674,amidated residue
+RESID:38,O-phospho-L-threonine,PSI-MOD:00696,phosphorylated residue
+RESID:55,N6-acetyl-L-lysine,PSI-MOD:00394,monoacetylated residue
+RESID:67,"N(omega)-,N(omega')-dimethyl-L-arginine",PSI-MOD:00429,dimethylated residue
+RESID:69,N(omega)-methyl-L-arginine,PSI-MOD:00599,monomethylated residue
+RESID:71,N5-methyl-L-glutamine,PSI-MOD:00599,monomethylated residue
+RESID:74,"N6,N6,N6-trimethyl-L-lysine",PSI-MOD:00711,trimethylated protonated-residue
+RESID:75,"N6,N6-dimethyl-L-lysine",PSI-MOD:00429,dimethylated residue
+RESID:76,N6-methyl-L-lysine,PSI-MOD:00599,monomethylated residue
+,None,None,None

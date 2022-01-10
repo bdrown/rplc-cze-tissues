@@ -1,0 +1,69 @@
+---
+title: "Filter by Fragment Support"
+output: html_notebook
+---
+
+I noticed that a lot of the hits in the dataset don't have great fragmentation
+support.
+
+```{r}
+library(tidyverse)
+load("preprocessed.RData")
+```
+
+
+
+
+
+Plotting the number of fragments supporting mods
+```{r}
+plot <- hits %>%
+  filter(modified == TRUE) %>%
+  group_by(PFR) %>%
+  summarise(num_fragments = max(num_fragments)) %>%
+  ggplot(aes(x = num_fragments)) +
+  geom_histogram(binwidth = 1) +
+  labs(x = "# Supporting Fragment Ions", y = "Proteoforms") +
+  scale_x_continuous(limits = c(-0.5, 30)) +
+  theme_bw(base_size = 20) +
+  theme(axis.title = element_text(face = "bold"))
+plot
+pdf(file = "figures/rescore_modified_pfr.pdf", width = 5, height = 5)
+print(plot)
+dev.off()
+
+plot <- hits %>%
+  filter(varied == TRUE) %>%
+  group_by(PFR) %>%
+  summarise(num_fragments = max(num_fragments)) %>%
+  ggplot(aes(x = num_fragments)) +
+  geom_histogram(binwidth = 1) +
+  labs(x = "# Supporting Fragment Ions", y = "Proteoforms") +
+  scale_x_continuous(limits = c(-0.5, 30)) +
+  theme_bw(base_size = 20) +
+  theme(axis.title = element_text(face = "bold"))
+plot
+pdf(file = "figures/rescore_varied_pfr.pdf", width = 5, height = 5)
+print(plot)
+dev.off()
+
+x <- hits %>%
+  mutate(Mod_type = ifelse(modified,
+                           ifelse(varied,"Modified and Varied", "Modified"),
+                           ifelse(varied,"Varied", "Unmodified"))) %>%
+  dplyr::select(PFR, Mod_type) %>%
+  unique() %>%
+  group_by(Mod_type) %>%
+  summarise(Count = n()) %>%
+  mutate(Percent = Count/sum(Count))
+x
+plot <- ggplot(x, aes(x = "", y = Count, fill = Mod_type)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  theme_void()
+plot
+pdf(file = "figures/PFR_modification_pie.pdf", width = 5, height = 5)
+print(plot)
+dev.off()
+
+```
