@@ -1,0 +1,25 @@
+RawFile:	\\resfiles.northwestern.edu\krgData\Projects\2021 - HuBMAP All\xTissue Comparison\Samples\20210215_kjb9186_HuBMAP_CESI_SmInt_biorep01_frac01_01.raw
+Instrument:	Orbitrap Eclipse
+ExperimentMsOrder:	Ms2
+MS1Analyzer:	MassAnalyzerFTMS
+MS2Analyzer:	MassAnalyzerFTMS
+MS3Analyzer:	None
+TotalAnalysisTime(min):	75.9984
+TotalScans:	9922
+NumMs1Scans:	4637
+NumMs2Scans:	5285
+NumMs3Scans:	0
+MeanMs2TriggerRate(/Ms1Scan):	1.1397
+Ms1ScanRate(/sec):	1.0169
+Ms2ScanRate(/sec):	1.159
+MeanDutyCycle(s):	0.4832
+MedianMs1FillTime(ms):	50
+MedianMs2FillTime(ms):	487.6139
+MedianMs3FillTime(ms):	0
+Ms2MedianSummedIntensity:	1576903.4111
+MedianMS1IsolationInterference:	1
+MedianPeakWidthAt10%H(s):	21.2949
+MedianPeakWidthAt50%H(s):	5.6975
+MedianAsymmetryFactor:	1.0342
+PeakCapacity:	800.3487
+NumEsiInstabilityFlags:	32

@@ -1,0 +1,25 @@
+RawFile:	\\resfiles.northwestern.edu\krgData\Projects\2021 - HuBMAP All\xTissue Comparison\Samples\20201116_bsd0560_HuBMAP_PLRPS_Lung_biorep02_frac03_03.raw
+Instrument:	Orbitrap Eclipse
+ExperimentMsOrder:	Ms2
+MS1Analyzer:	MassAnalyzerFTMS
+MS2Analyzer:	MassAnalyzerFTMS
+MS3Analyzer:	None
+TotalAnalysisTime(min):	81.9893
+TotalScans:	8346
+NumMs1Scans:	2417
+NumMs2Scans:	5929
+NumMs3Scans:	0
+MeanMs2TriggerRate(/Ms1Scan):	2.453
+Ms1ScanRate(/sec):	0.4913
+Ms2ScanRate(/sec):	1.2052
+MeanDutyCycle(s):	2.7569
+MedianMs1FillTime(ms):	11.3016
+MedianMs2FillTime(ms):	76.5923
+MedianMs3FillTime(ms):	0
+Ms2MedianSummedIntensity:	11428972.502
+MedianMS1IsolationInterference:	1
+MedianPeakWidthAt10%H(s):	35.6085
+MedianPeakWidthAt50%H(s):	6.6357
+MedianAsymmetryFactor:	1.4358
+PeakCapacity:	741.3621
+NumEsiInstabilityFlags:	0

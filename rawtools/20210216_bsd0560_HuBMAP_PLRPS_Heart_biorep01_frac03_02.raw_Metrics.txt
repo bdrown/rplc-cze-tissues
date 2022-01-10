@@ -1,0 +1,25 @@
+RawFile:	\\resfiles.northwestern.edu\krgData\Projects\2021 - HuBMAP All\xTissue Comparison\Samples\20210216_bsd0560_HuBMAP_PLRPS_Heart_biorep01_frac03_02.raw
+Instrument:	Orbitrap Fusion Lumos
+ExperimentMsOrder:	Ms2
+MS1Analyzer:	MassAnalyzerFTMS
+MS2Analyzer:	MassAnalyzerFTMS
+MS3Analyzer:	None
+TotalAnalysisTime(min):	79.9802
+TotalScans:	3950
+NumMs1Scans:	1760
+NumMs2Scans:	2190
+NumMs3Scans:	0
+MeanMs2TriggerRate(/Ms1Scan):	1.2443
+Ms1ScanRate(/sec):	0.3668
+Ms2ScanRate(/sec):	0.4564
+MeanDutyCycle(s):	2.4915
+MedianMs1FillTime(ms):	3.0325
+MedianMs2FillTime(ms):	170.6159
+MedianMs3FillTime(ms):	0
+Ms2MedianSummedIntensity:	6373318.3246
+MedianMS1IsolationInterference:	1
+MedianPeakWidthAt10%H(s):	42.5099
+MedianPeakWidthAt50%H(s):	12.6883
+MedianAsymmetryFactor:	1.2445
+PeakCapacity:	378.2281
+NumEsiInstabilityFlags:	0

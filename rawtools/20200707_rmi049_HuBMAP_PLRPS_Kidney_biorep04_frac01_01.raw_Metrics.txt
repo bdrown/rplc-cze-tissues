@@ -1,0 +1,25 @@
+RawFile:	\\resfiles.northwestern.edu\krgData\Projects\2021 - HuBMAP All\xTissue Comparison\Samples\20200707_rmi049_HuBMAP_PLRPS_Kidney_biorep04_frac01_01.raw
+Instrument:	Orbitrap Eclipse
+ExperimentMsOrder:	Ms2
+MS1Analyzer:	MassAnalyzerFTMS
+MS2Analyzer:	MassAnalyzerFTMS
+MS3Analyzer:	None
+TotalAnalysisTime(min):	89.9935
+TotalScans:	10103
+NumMs1Scans:	4550
+NumMs2Scans:	5553
+NumMs3Scans:	0
+MeanMs2TriggerRate(/Ms1Scan):	1.2204
+Ms1ScanRate(/sec):	0.8427
+Ms2ScanRate(/sec):	1.0284
+MeanDutyCycle(s):	0.483
+MedianMs1FillTime(ms):	50
+MedianMs2FillTime(ms):	600
+MedianMs3FillTime(ms):	0
+Ms2MedianSummedIntensity:	3917868.2484
+MedianMS1IsolationInterference:	1
+MedianPeakWidthAt10%H(s):	8.1276
+MedianPeakWidthAt50%H(s):	3.3803
+MedianAsymmetryFactor:	1.0183
+PeakCapacity:	1597.3821
+NumEsiInstabilityFlags:	367
